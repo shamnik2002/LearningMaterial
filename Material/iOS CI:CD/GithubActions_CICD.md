@@ -26,6 +26,8 @@
       - Next got to target -> build Settings and set the Current Project Version (build number) and Marketing Version (App version)
 <img width="1131" height="291" alt="Screenshot 2026-01-21 at 12 39 44 PM" src="https://github.com/user-attachments/assets/0171e0df-1700-4f03-875a-d2a8e06ef397" />
 
+4. Finally create app icon as that is a requirement to upload builds. I used Icon Composer (https://developer.apple.com/icon-composer/) to create an icon. make sure you icon doesn't have any transparent background. Add the app icon to you.
+   
   - Credit/Resources
     
       - https://medium.com/@hdmdhr/xcode-scheme-environment-project-configuration-setup-recipe-22c940585984
@@ -82,14 +84,34 @@ a digital credential from Apple that verifies a developer's identity, allowing t
           
   10. Now let's get the certs required for CICD
   11. Go to Keychain -> certificates -> right click on the development and distribution and export. They should be .p12 files, you need to set a password for you certificates. You need this password later so keep it in passwords app.
-          
-### Provisioning profiles, certificates
 
-## App Store Connect Set up
+## General Git Set up
 
-## Git Set up
+I try to follow the general branch guidelines
+
+**main**
+- protected branch with necessary rules like PR with approval required to merge
+- has the latest stable release with release tags
+
+**develop**
+- protected branch with necessary rules like PR with approval required to merge
+- has the ongoing development
+- This is where we cut release branch from when we code freeze
+
+**release/<App Version>**
+- Not a protected branch
+- Used between code freeze to actual release incase we need to cherry pick fixes
+- Created via git workflow
+
+Make sure you give permissions to git to allow to commit to branch within workflow. Go to Github -> Your repo -> settings -> Actions -> general (in the left pane)
+
+You need GITHUB_TOKEN to push to a branch. it is generated automatically and the var is available to use in the workflow.
+
+<img width="860" height="390" alt="Screenshot 2026-01-21 at 2 55 15 PM" src="https://github.com/user-attachments/assets/280d10f4-5625-49b7-bb74-c17548f7cfee" />
+
 
 ## CI/CD General Overview
+
 ### workflows
 
 ### PR Worflow
