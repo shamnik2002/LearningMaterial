@@ -112,9 +112,79 @@ You need GITHUB_TOKEN to push to a branch. it is generated automatically and the
 
 ## CI/CD General Overview
 
-### workflows
+I have 4 workflows
+
+1. PR Workflow - starts as soon as someone creates a PR.
+2. Push Workflow - starts whenever a PR is merged
+3. Code Freeze - Manual workflow which requires branch and release branch name as input. It should be triggered when we are ready to cut a release.
+4. Release - Manual workflow that builds, archives and uploads the build to testflight
+
+Before we get to these workflows. We need to set up environment and secrets that are required for the workflows.
+
+**Environment**
+
+1. Go to github -> your repo -> Settings -> Environments (left pane)
+2. Create Dev and Prod environment. We will use Dev for CI worflow and Prod for CD.
+3. Now lets add the secrets we need to access within the worflow for each environment
+     - GitHub secrets are encrypted variables used to securely store sensitive information, such as API keys, access tokens, and credentials, within your GitHub environment. They prevent sensitive data from being exposed in your code or workflow logs.
+4. Dev environment requires below
+     - BUILD_CERTIFICATE_BASE64 - this is Base 64 encoded value of the dev certificate, the .p12 file
+     - PROVISIONING_PROFILE_BASE64 - this is base 64 encoded value of your dev provisioning profile
+     - P12_PASSWORD - this is the password you set up for your certificate
+     - KEYCHAIN_PASSWORD - password you need to create for the keychain on the github runner. I use the passwords app to create the password, should be unique for each project.
+5. Prod environment requires all of the above + the below secrets
+     - EXPORT_OPTIONS_PLIST_BASE64 this is base64 encoded value of the exportOptions.plist file that is generated when you archive your project. We will modify as needed, more details below.
+     - ISSUER_ID - app store connect issure ID
+     - APP_KEY_ID - app store connect app Key ID that we generated
+     - APP_STORE_CONNECT_KEY - this is the value within the .p8 file that we downloaded when we created the key. Just open the file in a text editor and copy it.
+6. Getting Export Options plist
+   
+     - In Xcode Archive your project
+       
+<img width="1381" height="166" alt="Screenshot 2026-01-21 at 6 03 16 PM" src="https://github.com/user-attachments/assets/be4e62f9-8e6d-4388-863a-de4cf88b00fd" />
+ 
+     - Select distribute App
+     - Select Testflight option (make sure you are logged in Xcode)
+     - Once done select export option at the bottom. Make sure to export it to a folder outside your repo since we do not want to check in any of these files
+     - Now open the ExportOptions.plist file that is in the folder we exported
+     - NOTE: I'm not 100% if this is the right approach, but this is the only way it worked for me.
+     - Edit the plist 
+         - Remove the keys destination, generateAppStoreInformation, manageAppVersionAndBuildNumber, testflightInternalTestingOnly
+         - Change signingStyle to manual
+         - Add provisioningProfiles and signingCertificate. we use the name for these as values. For profile you can copy the name from profile on developer account. For certificate you can copy the name from keychain.
+
+<img width="801" height="267" alt="Screenshot 2026-01-21 at 6 16 41 PM" src="https://github.com/user-attachments/assets/873501cc-565e-461a-a373-e40762cbe49b" />
+
+
+To base64 encode use the below command. make sure you run it in the same directory where the file is. pbcopy will make sure the value is copied to clipboard.
+```
+  base64 -i <filename> | pbcopy
+```
+
+Now let's add all these to github secrets under the environments
+
+1. Go to github -> your repo -> Settings -> Environments (left pane)
+2. Select the environment and add secret
+<img width="711" height="445" alt="Screenshot 2026-01-21 at 5 54 27 PM" src="https://github.com/user-attachments/assets/045c59db-ddb8-45a8-b63d-7b78b9570ecc" />
+
+3. make sure to remove any extra new lines/spaces when you paste the value
+4. Here is how dev environment secrets should look
+<img width="866" height="368" alt="Screenshot 2026-01-21 at 6 00 03 PM" src="https://github.com/user-attachments/assets/def81ab2-0e6c-471c-98ef-878af99e2d31" />
+
+5. and here is how prod environment secrets should look
+
+<img width="876" height="581" alt="Screenshot 2026-01-21 at 6 29 32 PM" src="https://github.com/user-attachments/assets/f6e7fcef-a977-4cf7-8317-8603af2366e0" />
+
+
+Below we will go in detail how each workflow is set up.
 
 ### PR Worflow
+
+**Prerequisites**
+
+BUILD_CERTIFICATE_BASE64
+P12_PASSWORD
+KEYCHAIN_PASSWORD
 
 ### Push to default branch workflow (PR Merge)
 
