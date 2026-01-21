@@ -32,8 +32,57 @@
         
       - https://developer.apple.com/documentation/xcode/configuring-the-build-settings-of-a-target
         
-## Code Signing set up
+## Code Signing Set Up
 
+For this material we will do manual code signing
+
+**Provisioning Profile**
+
+A .mobileprovision file is like a permission slip issued by Apple. It tells iOS devices:
+
+  - Which devices are allowed to run your app (by device UDID).
+  
+  - Which app it’s for (identified by Bundle ID).
+  
+  - Who signed it (your Apple Developer identity or the dev identity you’re purchasing).
+    
+  - Whether it’s for development, ad hoc, or distribution (App Store or enterprise).
+
+**Ceritifcate**
+
+a digital credential from Apple that verifies a developer's identity, allowing them to securely sign and distribute apps, ensuring the code comes from a trusted source and hasn't been tampered with
+
+  - Authentication: Proves to Apple that you are who you say you are.
+    
+  - Code Signing: Digitally signs your app's code, linking it to your developer identity.
+    
+  - Security: Ensures apps haven't been altered since they were signed, protecting users from malicious code. 
+
+### Steps
+
+ 1. Go to developer.apple.com -> Certificates, Identifiers & Profiles and create a new identifier for your app
+ 2. Select App ID -> App 
+<img width="1206" height="428" alt="Screenshot 2026-01-21 at 1 58 33 PM" src="https://github.com/user-attachments/assets/7be94542-bb69-4ea0-b14e-2efa1833d93e" />
+
+  3. Now create the profiles for development and distribution using the same bundle ID. If you never created certificates before then you need to create one for development and distribution before creating the profiles. Select the appropriate certificate when creating the provisioning profile.
+  4. Once done download both profiles profiles and the certs. Double click them to make sure they are installed.
+  5. Now go to appstoreconnect to create your app where you will upload it and distribute it to testflight or ap store.
+  6. Go to apps -> create a new app
+<img width="603" height="694" alt="Screenshot 2026-01-21 at 2 07 32 PM" src="https://github.com/user-attachments/assets/0a2cc463-31c0-409b-a739-cfd256930fcc" />
+
+  7. Once app is created, now go to Users and Access -> App Store Connect API -> Integrations
+  8. We need to create AppID that we can use to upload the build within our git workflow
+  9. Generate the key. You need the below info for uploading the build
+      
+        - Key ID you just created
+          
+        - Issuer ID you should see just above the keys
+          
+        - You should see a download button next to the key created download and save the file in a secure place. It should be a .p8 extension. Note that once you download it you can't download it again.
+          
+  10. Now let's get the certs required for CICD
+  11. Go to Keychain -> certificates -> right click on the development and distribution and export. They should be .p12 files, you need to set a password for you certificates. You need this password later so keep it in passwords app.
+          
 ### Provisioning profiles, certificates
 
 ## App Store Connect Set up
