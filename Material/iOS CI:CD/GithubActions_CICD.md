@@ -3,6 +3,8 @@
 ## Sample iOS repo with workflows 
 https://github.com/shamnik2002/SampleCICDApp/actions 
 
+<hr>
+
 ## App Set Up
 1. I usually create repo on git and then create the iOS project to make the set up easier https://github.com/shamnik2002/SampleCICDApp
 2. Once iOS App is created, I include SDWebImage package so we can handle SPM as well in the CI/CD process
@@ -36,7 +38,8 @@ https://github.com/shamnik2002/SampleCICDApp/actions
       - https://medium.com/@hdmdhr/xcode-scheme-environment-project-configuration-setup-recipe-22c940585984
         
       - https://developer.apple.com/documentation/xcode/configuring-the-build-settings-of-a-target
-        
+
+<hr>
 ## Code Signing Set Up
 
 For this material we will do manual code signing
@@ -88,6 +91,8 @@ a digital credential from Apple that verifies a developer's identity, allowing t
   10. Now let's get the certs required for CICD
   11. Go to Keychain -> certificates -> right click on the development and distribution and export. They should be .p12 files, you need to set a password for you certificates. You need this password later so keep it in passwords app.
 
+<hr>
+
 ## General Git Set up
 
 I try to follow the general branch guidelines
@@ -112,15 +117,15 @@ You need GITHUB_TOKEN to push to a branch. it is generated automatically and the
 
 <img width="860" height="390" alt="Screenshot 2026-01-21 at 2 55 15 PM" src="https://github.com/user-attachments/assets/280d10f4-5625-49b7-bb74-c17548f7cfee" />
 
+<hr>
 
 ## CI/CD General Overview
 
-I have 4 workflows
+I have 3 workflows
 
-1. PR Workflow - starts as soon as someone creates a PR.
-2. Push Workflow - starts whenever a PR is merged
-3. Code Freeze - Manual workflow which requires branch and release branch name as input. It should be triggered when we are ready to cut a release.
-4. Release - Manual workflow that builds, archives and uploads the build to testflight
+1. PR Workflow - starts as soon as someone creates a PR against develop or merges the PR to develop.
+2. Code Freeze - Manual workflow which requires branch and release branch name as input. It should be triggered when we are ready to cut a release.
+3. Release - Manual workflow that builds, archives and uploads the build to testflight
 
 Before we get to these workflows. We need to set up environment and secrets that are required for the workflows.
 
@@ -181,12 +186,16 @@ Now let's add all these to github secrets under the environments
 
 Below we will go in detail how each workflow is set up.
 
+............................................................................................................................................................
+
 ### Notes:
 
 1. Double check indentations if work flow fails
 2. If a single command spans multiple lines then make sure `\` is the last character on the line
 3. We are the mercy of what git has to offer in terms of environment, macOS, iOS, XCode, iOS simulators and devices
 4. Simulators / device need to match exactly or builds fail, even then randomly some combinations are not available at times.
+
+............................................................................................................................................................
 
 ### PR Worflow
 
@@ -209,6 +218,8 @@ KEYCHAIN_PASSWORD
       on:
         # Triggers the workflow on push or pull request events but only for the "main" branch 
         pull_request:
+          branches: [ "develop" ]
+        push:
           branches: [ "develop" ]
 ```
 4. Next we specify the Jobs and for each job we specify the steps that need to run
@@ -378,13 +389,169 @@ jobs:
 
 That was a lot, but we will reuse some of this in next flows so major chunk is done!
 
-### Push to default branch workflow (PR Merge)
-
-
+............................................................................................................................................................
 
 ### Code Freeze Workflow
 
+This is the simplest workflow all we do here is accept a release version, cut a release branch with the version number off develop branch and commit it.
+
+1. This ia manual workflow for now so no triggers set up for this
+```
+on:
+  workflow_dispatch:
+    # Inputs the workflow accepts.
+    inputs:
+      release_version:
+        # Friendly description to be shown in the UI instead of 'name'
+        description: "Release version (e.g. 1.2.0)"
+        # Input has to be provided for the workflow to run
+        required: true
+        # The data type of the input
+        type: string
+```
+2. This specifies that we require inputs like release version. No validation yet but that's something we need to add in future.
+```
+jobs:
+  release:
+    runs-on: macos-latest
+    permissions:
+      contents: write
+```
+3. This specifies th runner OS, since we are not actually doing a build macos-latest is ok.
+4. we also make sure the job has write permission
+```
+steps:
+      - name: Checkout develop
+        uses: actions/checkout@v4
+
+      - name: Create release branch
+        run: |
+          RELEASE_BRANCH="release/${{ inputs.release_version }}"
+          git checkout -b "$RELEASE_BRANCH"
+```
+5. Checkout develop which is our default branch
+6. now we use the release version to create release branch
+```
+     - name: Update iOS App version and build number
+        run: |
+          pwd
+          ls
+          cd SpaceNews
+          echo "$(<"release.xcconfig")"
+
+          BUILD_NUMBER=$GITHUB_RUN_NUMBER
+          MARKETING_VERSION=${{ inputs.release_version }}          
+          
+          sed -i '' \
+            -e "s/^MARKETING_VERSION = .*/MARKETING_VERSION = $MARKETING_VERSION/" \
+            -e "s/^CURRENT_PROJECT_VERSION = .*/CURRENT_PROJECT_VERSION = $BUILD_NUMBER/" \
+            release.xcconfig
+
+          echo "Build number and version updated"
+          echo "$(<"release.xcconfig")"
+```
+7. Next step is to update the build number and app version
+8. You can skip checking for release.xcconfig this is just for debugging where I print the contents to confirm update
+9. For build number we rely on GITHUB_RUN_NUMBER which is provided by git and the number increment everytime we execute the workflow. It does not update if we re-run the workflow due to failed jobs. This is considered a better approach since it avoids concurrency issues in case we have parallel builds running. But you can increment it yourself by reading the last build number if needed.
+10. Next we use the input taht we got for release version and update it. Marketing version in xconfig and build settings is the app version.
+11. sed is stream editor command, -i means edit file in place
+12. s stands for substitue, /^MARKETING_VERSION = .*/ is the pattern to match. ^ is start of line then string to match and .* is to match any char after =
+
+```
+     - name: Commit version bump
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          BUILD_NUMBER=$GITHUB_RUN_NUMBER
+          
+          git add .
+          git commit -m "chore: cut release ${{ inputs.release_version }} ($BUILD_NUMBER)"
+
+     - name: Push release branch
+        run: |
+          git push origin HEAD
+```
+13. Here is commit the changes to git and push to remote
+14. You should see the branch on your repo with the changes
+
+**NOTES**
+- If you already tried archiving and uploading to testflight via xcode before then make sure you build number is set correctly in your xcconfig files
+- App store won't let you upload if the build number is smaller than last build there.
+
+............................................................................................................................................................
+
 ### Release Workflow
+
+1. This is also a manual workflow so we get to select the branch we need to run this workflow on. here the branch will be the release branch we created in the code freeze workflow. Input accepts branch name but it's more a ack and we don't really use it in the workflow.
+2. Release workflow reuses the steps checkout repo, set xcode, install certs/profiles, cache SPM from the PR workflow the only difference is that the env = Prod here. This means git will read the secrets from prod environment to download the distribution certs/profile and everything needed.
+3. The only missing piece here is that we also need the export options plist as part of the install certs/ profiles step
+```
+            # import export options plist
+            echo -n "$EXPORT_OPTS" | base64 --decode > "$EXPORT_OPTS_PATH"
+
+            echo "import export options plist done"
+```
+5. So we will directly jump to the step where we create the archive
+```
+      - name: Build and Archive
+        run: |
+          set -euo pipefail 
+         xcodebuild clean archive \
+            -project SampleCICDApp/SampleCICDApp.xcodeproj \
+            -scheme "SampleCICDApp" \
+            -configuration Release \
+            -destination generic/platform=iOS  \
+            -derivedDataPath $GITHUB_WORKSPACE/DerivedData \
+            -archivePath $GITHUB_WORKSPACE/SampleCICDApp.xcarchive \
+            -verbose \
+          | xcbeautify
+```
+6. Instead of test we archive here. Also make sure to set configuration to release, destination can be generic.
+7. Always set dereivedDataPath and archivePath so it's easy to grab stuff when needed from a predictable path.
+8. -verbose is optional in case you need detailed logs
+```
+    - name: Upload xcresult
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: xcresult
+          path: |
+            ${{ github.workspace }}/DerivedData/Logs/Test/*.xcresult
+```
+9. Next upload xcresult in case of failure. You could also on success if you want to monitor the health of the system
+```
+     - name: Export ipa
+        run: |          
+          EXPORT_OPTS_PATH=$RUNNER_TEMP/ExportOptions.plist
+          echo "$(<"$EXPORT_OPTS_PATH")"
+          xcodebuild -exportArchive -archivePath $GITHUB_WORKSPACE/SampleCICDApp.xcarchive -exportOptionsPlist $EXPORT_OPTS_PATH -exportPath $GITHUB_WORKSPACE/build -verbose
+
+```
+10. Here is export the ipa. This is where exportOptions.plist if needed and based on the settings there the ipa is created
+```
+     - name: Upload application
+        id: upload_step
+        env:
+          API_KEY_BASE64: ${{ secrets.APP_STORE_CONNECT_KEY }}
+          APPSTORE_KEY_ID: ${{ secrets.APP_KEY_ID }}
+          APPSTORE_ISSUER_ID: ${{ secrets.ISSUER_ID }}
+        run: |
+          mkdir -p ~/.appstoreconnect/private_keys
+          echo -n "$API_KEY_BASE64" > ~/.appstoreconnect/private_keys/AuthKey_$APPSTORE_KEY_ID.p8
+          xcrun altool --validate-app -f $GITHUB_WORKSPACE/build/SampleCICDApp.ipa -t ios --apiKey "$APPSTORE_KEY_ID" --apiIssuer "$APPSTORE_ISSUER_ID"
+          xcrun altool --upload-app -f $GITHUB_WORKSPACE/build/SampleCICDApp.ipa -t ios --apiKey "$APPSTORE_KEY_ID" --apiIssuer "$APPSTORE_ISSUER_ID"
+```
+11. Now we upload the ipa using the app store connect key, issureID and app key ID
+12. First read the secrets from git
+13. Now we need to create the .p8 file with the app store connect key. The file has a specific name format where it uses the app Key ID.
+14. We use the altool to first validate the app and then uplaod the build
+
+**NOTE**
+Usually works ok but if you see any failure like failed to connect to account means it could be one of the below issues
+- ExportOptions.plist was not configured properly. Make sure you follow the steps above where we edited the exportOptions.plist
+- App store connect key value is incorrect
+............................................................................................................................................................
 
 ### Post Release Workflow
 
+<hr>
