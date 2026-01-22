@@ -1,5 +1,8 @@
 # iOS CI CD with Github Actions
 
+## Sample iOS repo with workflows 
+https://github.com/shamnik2002/SampleCICDApp/actions 
+
 ## App Set Up
 1. I usually create repo on git and then create the iOS project to make the set up easier https://github.com/shamnik2002/SampleCICDApp
 2. Once iOS App is created, I include SDWebImage package so we can handle SPM as well in the CI/CD process
@@ -361,9 +364,23 @@ jobs:
 ```
 41. You can skip testing specific targets if needed using the command `-skip-testing <test target> \`
 42. You should specify the derived data path, makes it easy to cache SPM, we have a predictable path
-43. Finally xcbeautify to make logs readable. But when debugging also use -verbose
+43. xcbeautify to make logs readable. But when debugging also use -verbose
+```
+     - name: Upload xcresult
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: xcresult
+          path: |
+            ${{ github.workspace }}/DerivedData/Logs/Test/*.xcresult
+```
+44. Finally upload results in case of failures
+
+That was a lot, but we will reuse some of this in next flows so major chunk is done!
 
 ### Push to default branch workflow (PR Merge)
+
+
 
 ### Code Freeze Workflow
 
