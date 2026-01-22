@@ -178,13 +178,190 @@ Now let's add all these to github secrets under the environments
 
 Below we will go in detail how each workflow is set up.
 
+### Notes:
+
+1. Double check indentations if work flow fails
+2. If a single command spans multiple lines then make sure `\` is the last character on the line
+3. We are the mercy of what git has to offer in terms of environment, macOS, iOS, XCode, iOS simulators and devices
+4. Simulators / device need to match exactly or builds fail, even then randomly some combinations are not available at times.
+
 ### PR Worflow
 
 **Prerequisites**
 
 BUILD_CERTIFICATE_BASE64
+
 P12_PASSWORD
+
 KEYCHAIN_PASSWORD
+
+1. To create a worflow, go to Github -> your repo -> Actions and pick any template we will just edit it as necessary. This should create the directory structure for you as well. All workflows need to be in <yourApp> / .github / workflows / <workflow>.yml
+2. Name the workflow to reflect this will be triggered on PR submission.
+3. For this follow our trigger is Pull request creation
+```
+      # This is a basic workflow to help you get started with Actions
+      name: PR Submission
+
+      # Controls when the workflow will run
+      on:
+        # Triggers the workflow on push or pull request events but only for the "main" branch 
+        pull_request:
+          branches: [ "develop" ]
+```
+4. Next we specify the Jobs and for each job we specify the steps that need to run
+
+```
+# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+jobs:
+  # This workflow contains a single job called "build"
+  build_and_test:
+    # The type of runner that the job will run on
+    runs-on: macos-26
+    environment: Dev
+
+    # Steps represent a sequence of tasks that will be executed as part of the job
+    steps:
+```
+5. build_and_test is the name of the job.
+6. Set the runner to use a specific macOS to allow predictable CI flow
+7. Set our environment to Dev so the secrets used will be from this environment we set up previously
+8. Now let's work on Steps
+
+```
+      - name: Checkout repository
+        uses: actions/checkout@v2
+```
+9. We use a predefine git action to checkout the repo on runner
+
+```
+      - name: Select Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: '26'
+```
+10. Select a specific Xcode version
+```
+      - name: Install Certificates and Provisioning Profile
+        env:
+          BUILD_CERTIFICATE_BASE64: ${{ secrets.BUILD_CERTIFICATE_BASE64 }}
+          P12_PASSWORD: ${{ secrets.P12_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}          
+          
+        run: |
+```
+11. Now we install our certificates and provisioning profiles.
+12. Create all the varriables we need. Here we are just reading the values from the github secrets we created
+```
+        run: |
+            # create variables
+            CERTIFICATE_PATH=$RUNNER_TEMP/build_certificate.p12
+            PP_PATH=$RUNNER_TEMP/build_pp.mobileprovision
+            KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
+
+            echo "create variables done"
+```
+13. Create variables to hold the files into which we will copy the values from github secrets
+```
+            # import certificate and provisioning profile from secrets
+            echo -n "$BUILD_CERTIFICATE_BASE64" | base64 --decode > "$CERTIFICATE_PATH"
+            ls -lh "$CERTIFICATE_PATH"
+            echo "certificate exists"
+            file "$CERTIFICATE_PATH"
+            echo "check file type"
+            echo -n "${{ secrets.PROVISIONING_PROFILE_BASE64 }}" | base64 --decode > "$PP_PATH"
+
+            echo "import cert and provisioning profiles done"
+```
+14. Now import certificate and provisioning profile to the specific file paths we defined
+15. For both we need to decode since our github secrets were encoded in base64
+```
+            # create keychain
+            security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+            echo "create keychain done"
+            security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+            echo "set keychain done"
+            security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+            echo "unlock keychain done"
+```
+16. Now we need to set up keychain so we can import the certificate and provisioning profiles there
+17. Create keychain at the given path and set a password for it. This is the keychain password we created and added to the github secrets
+18. Next we need to configure the key chain settings
+19. -l stands for lock when systems times out, -u stands for lock after timeout, and -t is the timeout in seconds. So we are locking the keychain after 6 hours of inactivity
+20. Next unlock the keychain using our password
+```
+            # import certificates into keychain            
+            security import "$CERTIFICATE_PATH" -P "$P12_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
+            echo "import cert and p12 password done"
+            security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+            echo "set-key-partition-list done"
+            security list-keychain -d user -s "$KEYCHAIN_PATH"
+            echo "list-keychain done"
+
+            echo "import certificates into keychain done"
+```
+21. Now import the certificate in the keychain
+22. we specify the certificate at the path we created, provide the password for the certificate to unlock it
+23. -A allows all applications access
+24. -t cert specifies the entity that is being imported, here it is a certificate
+25. -f pkcs12 specifies the file type
+26. -k "$KEYCHAIN_PATH" tells that it needs to be imported here
+```
+            # import provisioning profile
+            mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
+            cp "$PP_PATH" ~/Library/MobileDevice/Provisioning\ Profiles
+            security find-identity -p codesigning -v
+            security cms -D -i ~/Library/MobileDevice/Provisioning\ Profiles/build_pp.mobileprovision
+            echo "import provisioning profile done"
+```
+27. Now import provisioning profile in the keychain
+28. provisioning profiles are stored at a specific path and that's where xcode will read from
+29. create the directory and copy the provisioning profile there
+30. Now verify whether the certificates are correctly installed and usable. You should see in the logs of your workflow.
+31. Now verify provisioning profile, we log this as well. these are more for debugging so can be removed once the workflow is set up
+
+```
+      # save derived data to a predictable path
+      - name: Cache SPM Dependencies
+        uses: actions/cache@v4
+        id: spm-cache
+        with:
+          path: |
+            
+            ${{ github.workspace }}/DerivedData/**/SourcePackages/checkouts            
+          key: ${{ runner.os }}-spm-${{ hashFiles('**/Package.resolved') }}
+          restore-keys: |
+            ${{ runner.os }}-spm-
+```
+32. Next if you have packages, it is a good idea to cache them
+33. NOTE: for every first run of this workflow on your PR, there will be a cache miss. The Cache is unique to each branch, so subsequent runs will benefit when you address feedback on your PR.
+34. We are using a predefined git action.
+35. We need to specify where the packages are and then use the package.resolved as the key since it will change if there are any changes to the package.swift file or packages pulled.
+```
+    - name: Build and Test
+        run: |
+          set -euo pipefail 
+          xcodebuild clean test \
+            -project SampleCICDApp/SampleCICDApp.xcodeproj \
+            -scheme "SampleCICDApp" \
+            -configuration Debug \
+            -destination 'platform=iOS Simulator,name=iPhone 17'  \
+            -derivedDataPath $GITHUB_WORKSPACE/DerivedData \
+          | xcbeautify
+```
+36. finally we build and test our code
+37. set -euo pipefail basically tells github to bail early in case of any errors
+38. Next we need to specify the project, scheme to use, configuration
+39. destination is the simulator/device we want to run the tests on. You need to make sure they match exactly to what git has to offer
+40. if not sure you are use the below step as part of you workflow to check available simulators
+```
+     - name: List available simulators (optional, for debugging)
+        run: xcrun simctl list devices available
+        'platform=iOS Simulator,name=iPhone 17,OS=18.0' \
+         -derivedDataPath $GITHUB_WORKSPACE/DerivedData
+```
+41. You can skip testing specific targets if needed using the command `-skip-testing <test target> \`
+42. You should specify the derived data path, makes it easy to cache SPM, we have a predictable path
+43. Finally xcbeautify to make logs readable. But when debugging also use -verbose
 
 ### Push to default branch workflow (PR Merge)
 
