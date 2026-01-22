@@ -547,6 +547,7 @@ steps:
 14. We use the altool to first validate the app and then uplaod the build
 
 **NOTE**
+
 Usually works ok but if you see any failure like failed to connect to account means it could be one of the below issues
 - ExportOptions.plist was not configured properly. Make sure you follow the steps above where we edited the exportOptions.plist
 - App store connect key value is incorrect
@@ -554,4 +555,11 @@ Usually works ok but if you see any failure like failed to connect to account me
 
 ### Post Release Workflow
 
+1. here we could create a workflow where the release branch is merged in main and we add a tag on main branch
+
 <hr>
+
+## Credits
+
+1. This blog by Oleksandr was very helpful in how to set up github workflow https://tthemolex.medium.com/github-actions-for-ios-project-afded180a604
+2. This blog by Daniel Hu was helpful in understanding how to build xcconfig per environment https://tthemolex.medium.com/github-actions-for-ios-project-afded180a604
