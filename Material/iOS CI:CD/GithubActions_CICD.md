@@ -40,6 +40,7 @@ https://github.com/shamnik2002/SampleCICDApp/actions
       - https://developer.apple.com/documentation/xcode/configuring-the-build-settings-of-a-target
 
 <hr>
+
 ## Code Signing Set Up
 
 For this material we will do manual code signing
