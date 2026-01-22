@@ -436,7 +436,7 @@ steps:
         run: |
           pwd
           ls
-          cd SpaceNews
+          cd SampleCICDApp
           echo "$(<"release.xcconfig")"
 
           BUILD_NUMBER=$GITHUB_RUN_NUMBER
