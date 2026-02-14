@@ -16,8 +16,19 @@ App has 2 views, a list view and a detail view to allow users to view basic deta
 
 ### Project without context/specifications
 
+https://github.com/shamnik2002/OldClaudeCoinbase 
+
+Prompt used here was 
+
+```
+Build a simple iOS app in the selected CoinbaseClaude project that lists a few crypto currencies.
+The app should have a list view that shows the cyrpto product id and the price.
+You can get the list and real time data using websockets from coinbase exchange api here https://docs.cdp.coinbase.com/exchange/websocket-feed/channels
+```
+
 ### Project with context + specifications
 
+https://github.com/shamnik2002/ClaudeCoinbase
 
 ## System Requirements
 
@@ -202,3 +213,4 @@ why is it needed when there is receiveMessages
 ```
 @``TickerService``  loadCachedData always reads from persistentStore instead of checking if there is already something in cache. Should only go to persistent store if cache is empty
 ```
+
